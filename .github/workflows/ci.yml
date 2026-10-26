@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROMETHEUS_IMAGE: prom/prometheus:v2.55.1
+  ALERTMANAGER_IMAGE: prom/alertmanager:v0.27.0
+
+jobs:
+  python:
+    name: lint, types, tests
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Mypy
+        run: mypy
+
+      - name: Pytest
+        run: pytest
+
+      - name: Regenerate examples and fail on drift
+        run: |
+          slokit generate examples/slos -o examples/generated
+          git diff --exit-code -- examples/generated
+          test -z "$(git status --porcelain -- examples/generated)"
+
+  prometheus:
+    name: promtool and amtool
+    runs-on: ubuntu-24.04
+    needs: python
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: promtool check rules
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work --entrypoint promtool "$PROMETHEUS_IMAGE" \
+            check rules examples/generated/prometheus/rules/*.yaml
+
+      - name: promtool check config (with the generated rules mounted)
+        run: |
+          docker run --rm \
+            -v "$PWD/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/examples/generated/prometheus/rules:/etc/prometheus/rules:ro" \
+            --entrypoint promtool "$PROMETHEUS_IMAGE" \
+            check config /etc/prometheus/prometheus.yml
+
+      - name: amtool check-config
+        run: |
+          docker run --rm -v "$PWD/alertmanager:/work:ro" --entrypoint amtool "$ALERTMANAGER_IMAGE" \
+            check-config /work/alertmanager.yml
+
+      - name: Validate dashboards are JSON
+        run: |
+          for f in examples/generated/grafana/dashboards/*.json; do
+            python3 -m json.tool "$f" > /dev/null && echo "ok $f"
+          done
