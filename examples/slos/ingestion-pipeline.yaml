@@ -1,0 +1,25 @@
+# Ingestion pipeline: freshness of the events table, written as raw PromQL to show
+# the escape hatch. A minute is good when the last successful run is under 15 minutes old.
+apiVersion: slokit/v1
+service: ingestion-pipeline
+owner: data-platform-team
+labels:
+  tier: "2"
+alerting:
+  page:
+    team: data-platform-oncall
+  ticket:
+    team: data-platform-team
+  runbook_url: https://runbooks.example.com/ingestion-pipeline
+slos:
+  - name: freshness
+    description: Minutes during which the events table is less than 15 minutes old.
+    objective: 99.5
+    window: 30d
+    sli:
+      type: freshness
+      queries:
+        good: >-
+          sum_over_time(((time() - max(ingestion_last_success_timestamp_seconds{pipeline="events"})) < bool 900)[{{window}}:1m])
+        total: >-
+          count_over_time((time() - max(ingestion_last_success_timestamp_seconds{pipeline="events"}))[{{window}}:1m])

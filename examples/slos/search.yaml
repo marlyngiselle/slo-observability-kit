@@ -1,0 +1,24 @@
+# Search: p95 latency expressed as an SLO, 95% of queries under 400 ms.
+apiVersion: slokit/v1
+service: search
+owner: discovery-team
+labels:
+  tier: "2"
+alerting:
+  page:
+    team: discovery-oncall
+  ticket:
+    team: discovery-team
+  runbook_url: https://runbooks.example.com/search
+slos:
+  - name: latency-p95
+    description: Search queries answered in under 400 ms.
+    objective: 95
+    window: 28d
+    sli:
+      type: latency
+      template:
+        metric: http_server_request_duration_seconds
+        selector: service="search",route="/api/search"
+        le: "0.4"
+        percentile: 95

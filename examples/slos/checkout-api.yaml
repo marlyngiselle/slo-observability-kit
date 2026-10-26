@@ -1,0 +1,24 @@
+# Checkout API: request availability, measured at the service edge.
+apiVersion: slokit/v1
+service: checkout-api
+owner: payments-team
+labels:
+  tier: "1"
+alerting:
+  page:
+    team: payments-oncall
+    channel: "#payments-oncall"
+  ticket:
+    team: payments-team
+  runbook_url: https://runbooks.example.com/checkout-api
+slos:
+  - name: availability
+    description: Checkout requests that do not fail with a server error.
+    objective: 99.9
+    window: 28d
+    sli:
+      type: availability
+      template:
+        metric: http_server_requests_total
+        selector: service="checkout-api"
+        good_filter: code!~"5.."
