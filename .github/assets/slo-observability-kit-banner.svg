@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">slo-observability-kit</title>
+  <desc id="desc">SLOs as code, with burn-rate alerts, error budgets and telemetry pipelines.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1f4d"/>
+      <stop offset="0.55" stop-color="#14347f"/>
+      <stop offset="1" stop-color="#2456c8"/>
+    </linearGradient>
+    <linearGradient id="budget" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9cc3ff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#9cc3ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.3" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="1"/>
+    </linearGradient>
+    <mask id="fadeMask">
+      <rect width="1200" height="300" fill="url(#fade)"/>
+    </mask>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="300" fill="url(#bg)"/>
+  <rect width="1200" height="300" fill="url(#grid)"/>
+
+  <!-- telemetry waves -->
+  <g fill="none" stroke-linecap="round" mask="url(#fadeMask)">
+    <path d="M0 236 C 120 206, 200 266, 320 236 S 520 206, 640 236 S 840 266, 960 236 S 1120 206, 1200 230" stroke="#5b8def" stroke-opacity="0.35" stroke-width="2"/>
+    <path d="M0 252 C 140 226, 220 280, 360 252 S 560 224, 700 252 S 900 282, 1040 252 S 1160 230, 1200 246" stroke="#9cc3ff" stroke-opacity="0.22" stroke-width="2"/>
+    <path d="M0 268 C 160 248, 260 290, 400 268 S 600 246, 740 268 S 940 292, 1080 268 S 1180 254, 1200 262" stroke="#9cc3ff" stroke-opacity="0.14" stroke-width="2"/>
+  </g>
+
+  <!-- burn-rate panel -->
+  <g transform="translate(728 44)">
+    <rect width="420" height="180" rx="14" fill="#ffffff" fill-opacity="0.06" stroke="#9cc3ff" stroke-opacity="0.25"/>
+    <!-- thresholds -->
+    <g stroke-dasharray="6 6" stroke-width="1.5">
+      <line x1="20" y1="44" x2="400" y2="44" stroke="#ff8a80" stroke-opacity="0.75"/>
+      <line x1="20" y1="84" x2="400" y2="84" stroke="#ffb74d" stroke-opacity="0.6"/>
+      <line x1="20" y1="132" x2="400" y2="132" stroke="#9cc3ff" stroke-opacity="0.45"/>
+    </g>
+    <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#cfe0ff" fill-opacity="0.85">
+      <text x="372" y="38">14.4x</text>
+      <text x="384" y="78">6x</text>
+      <text x="384" y="126">1x</text>
+    </g>
+    <!-- error budget remaining, area -->
+    <path d="M20 30 C 90 34, 130 40, 170 52 S 230 96, 262 104 S 330 106, 400 108 L400 166 L20 166 Z" fill="url(#budget)"/>
+    <path d="M20 30 C 90 34, 130 40, 170 52 S 230 96, 262 104 S 330 106, 400 108" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- burn rate spike -->
+    <path d="M20 150 L60 148 L100 151 L140 146 L170 120 L190 36 L206 60 L224 112 L250 140 L290 146 L330 149 L370 147 L400 150" fill="none" stroke="#ffb4ab" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="190" cy="36" r="5" fill="#ff8a80"/>
+    <circle cx="190" cy="36" r="11" fill="none" stroke="#ff8a80" stroke-opacity="0.5"/>
+  </g>
+
+  <!-- title -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="64" y="112" font-size="52" font-weight="700" fill="#ffffff" letter-spacing="-0.5">slo-observability-kit</text>
+    <text x="66" y="152" font-size="21" fill="#cfe0ff">SLOs as code. Burn-rate alerts that page for the right reasons.</text>
+    <g font-size="13" font-weight="600" fill="#ffffff">
+      <rect x="64" y="178" width="108" height="28" rx="14" fill="#ffffff" fill-opacity="0.12" stroke="#9cc3ff" stroke-opacity="0.4"/>
+      <text x="118" y="197" text-anchor="middle">Prometheus</text>
+      <rect x="182" y="178" width="88" height="28" rx="14" fill="#ffffff" fill-opacity="0.12" stroke="#9cc3ff" stroke-opacity="0.4"/>
+      <text x="226" y="197" text-anchor="middle">Grafana</text>
+      <rect x="280" y="178" width="128" height="28" rx="14" fill="#ffffff" fill-opacity="0.12" stroke="#9cc3ff" stroke-opacity="0.4"/>
+      <text x="344" y="197" text-anchor="middle">OpenTelemetry</text>
+      <rect x="418" y="178" width="124" height="28" rx="14" fill="#ffffff" fill-opacity="0.12" stroke="#9cc3ff" stroke-opacity="0.4"/>
+      <text x="480" y="197" text-anchor="middle">Error budgets</text>
+    </g>
+  </g>
+</svg>
