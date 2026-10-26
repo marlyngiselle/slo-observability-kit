@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slokit"
+version = "0.1.0"
+description = "Turn SLO definitions in YAML into Prometheus rules, multi-window burn-rate alerts, Grafana dashboards and error-budget policies."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Giselle Da Costa" }]
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.6,<3",
+  "PyYAML>=6.0",
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: System :: Monitoring",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "types-PyYAML",
+  "promql-parser>=0.4,<1",
+]
+
+[project.scripts]
+slokit = "slokit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+slokit = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_decorators = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
