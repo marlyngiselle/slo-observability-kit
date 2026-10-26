@@ -11,6 +11,7 @@ from slokit.burnrate import (
     SLI_WINDOWS,
     BurnRateWindow,
     Severity,
+    first_alert,
     fmt,
     required_windows,
     windows_for,
@@ -93,3 +94,25 @@ def test_parse_duration(text: str, seconds: int) -> None:
 def test_parse_duration_rejects(text: str) -> None:
     with pytest.raises(ValueError, match="invalid duration"):
         parse_duration(text)
+
+
+@pytest.mark.parametrize(
+    ("error_ratio", "burn", "minutes"),
+    [
+        ("1", "14.4", "0.864"),
+        ("0.1", "14.4", "8.64"),
+        ("0.02", "14.4", "43.2"),
+        ("0.01", "6", "216"),
+        ("0.005", "3", "864"),
+        ("0.002", "1", "2160"),
+    ],
+)
+def test_first_alert_for_step_change(error_ratio: str, burn: str, minutes: str) -> None:
+    hit = first_alert(Decimal(error_ratio), Decimal("0.001"))
+    assert hit is not None
+    window, after = hit
+    assert (fmt(window.burn_rate), fmt(after)) == (burn, minutes)
+
+
+def test_no_alert_below_budget() -> None:
+    assert first_alert(Decimal("0.0009"), Decimal("0.001")) is None

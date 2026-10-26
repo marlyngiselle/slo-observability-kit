@@ -50,6 +50,17 @@ class BurnRateWindow:
         """Hours until a full budget is gone if this burn rate is sustained."""
         return Decimal(parse_duration(period)) / Decimal(3600) / self.burn_rate
 
+    def detection_minutes(self, error_ratio: Decimal, error_budget: Decimal) -> Decimal | None:
+        """Minutes for the long window to cross the threshold after a step change.
+
+        Returns None when the error ratio never reaches the threshold. The short
+        window, being twelve times shorter, always crosses first.
+        """
+        threshold = self.threshold(error_budget)
+        if error_ratio <= threshold:
+            return None
+        return Decimal(parse_duration(self.long_window)) / 60 * threshold / error_ratio
+
 
 DEFAULT_POLICY: tuple[BurnRateWindow, ...] = (
     BurnRateWindow(Severity.PAGE, Decimal("14.4"), "1h", "5m"),
@@ -78,6 +89,20 @@ def windows_for(
 def max_burn_rate(policy: tuple[BurnRateWindow, ...] = DEFAULT_POLICY) -> Decimal:
     """The steepest burn rate in a policy."""
     return max(w.burn_rate for w in policy)
+
+
+def first_alert(
+    error_ratio: Decimal,
+    error_budget: Decimal,
+    policy: tuple[BurnRateWindow, ...] = DEFAULT_POLICY,
+) -> tuple[BurnRateWindow, Decimal] | None:
+    """The policy entry that fires first for a sustained error ratio, and after how long."""
+    hits = [
+        (w, minutes)
+        for w in policy
+        if (minutes := w.detection_minutes(error_ratio, error_budget)) is not None
+    ]
+    return min(hits, key=lambda hit: hit[1]) if hits else None
 
 
 def fmt(value: Decimal) -> str:
