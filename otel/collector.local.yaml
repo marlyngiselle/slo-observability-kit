@@ -1,0 +1,39 @@
+# Local overlay for docker compose, merged on top of collector.yaml:
+#   otelcol-contrib --config=collector.yaml --config=collector.local.yaml
+# Maps merge key by key and lists are replaced, so the pipelines below fully
+# replace the Kubernetes ones. k8sattributes stays defined but is never started.
+
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: otel-collector
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["0.0.0.0:8888"]
+        - job_name: demo-service
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["demo-service:8000"]
+
+exporters:
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    resource_to_telemetry_conversion:
+      enabled: false
+
+  otlp/tracing:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/scrub-pii, batch]
+      exporters: [otlp/tracing]

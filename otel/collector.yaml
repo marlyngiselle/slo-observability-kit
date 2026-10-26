@@ -1,0 +1,123 @@
+# OpenTelemetry Collector, production shape (Kubernetes gateway or agent).
+#
+# Metrics:  OTLP from instrumented apps + Prometheus scrapes -> remote write to Prometheus.
+# Traces:   OTLP from instrumented apps -> PII scrubbing -> OTLP to the tracing backend.
+#
+# The local stack layers collector.local.yaml on top of this file to drop the
+# Kubernetes-only processor and point exporters at the compose services.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: otel-collector
+          scrape_interval: 30s
+          static_configs:
+            - targets: ["0.0.0.0:8888"]
+        - job_name: kubernetes-pods
+          scrape_interval: 30s
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: "true"
+            - source_labels: [__meta_kubernetes_namespace]
+              target_label: namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              target_label: pod
+
+processors:
+  # First in every pipeline: refuse data before the process runs out of memory.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # Attach pod, namespace and workload metadata so SLIs can be sliced by deployment.
+  k8sattributes:
+    auth_type: serviceAccount
+    passthrough: false
+    extract:
+      metadata:
+        - k8s.namespace.name
+        - k8s.deployment.name
+        - k8s.pod.name
+        - k8s.node.name
+    pod_association:
+      - sources:
+          - from: resource_attribute
+            name: k8s.pod.ip
+      - sources:
+          - from: connection
+
+  # PII scrubbing. Identifiers are hashed so traces can still be correlated,
+  # free-text personal data and credentials are dropped outright.
+  attributes/scrub-pii:
+    actions:
+      - key: enduser.id
+        action: hash
+      - key: user.email
+        action: delete
+      - key: user.full_name
+        action: delete
+      - key: client.address
+        action: delete
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: url.query
+        action: delete
+      - key: db.query.text
+        action: delete
+
+  batch:
+    send_batch_size: 8192
+    send_batch_max_size: 16384
+    timeout: 5s
+
+exporters:
+  prometheusremotewrite:
+    endpoint: http://prometheus.monitoring.svc:9090/api/v1/write
+    resource_to_telemetry_conversion:
+      enabled: true
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_elapsed_time: 300s
+
+  otlp/tracing:
+    endpoint: tracing-backend.monitoring.svc:4317
+    tls:
+      insecure: false
+    sending_queue:
+      enabled: true
+      queue_size: 5000
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      level: normal
+      address: 0.0.0.0:8888
+  pipelines:
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, k8sattributes, batch]
+      exporters: [prometheusremotewrite]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, attributes/scrub-pii, batch]
+      exporters: [otlp/tracing]

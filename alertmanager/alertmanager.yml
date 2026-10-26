@@ -1,0 +1,98 @@
+# Routing tree for SLO burn-rate alerts.
+#
+#   severity=page    -> the owning team's pager, 24/7, re-notify every hour
+#   severity=ticket  -> the owning team's queue, working hours only, re-notify daily
+#
+# Receivers point at placeholder webhooks. Swap them for your paging and ticketing
+# integrations; the routing and inhibition logic does not change.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: catch-all
+  group_by: [alertname, service, slo]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  routes:
+    # Pages: short waits, frequent reminders, never muted by business hours.
+    - matchers:
+        - severity="page"
+      receiver: oncall-default
+      group_wait: 10s
+      repeat_interval: 1h
+      routes:
+        - matchers: [team="payments-oncall"]
+          receiver: payments-pager
+        - matchers: [team="discovery-oncall"]
+          receiver: discovery-pager
+        - matchers: [team="data-platform-oncall"]
+          receiver: data-platform-pager
+
+    # Tickets: batched, delivered during working hours, reminded once a day.
+    - matchers:
+        - severity="ticket"
+      receiver: tickets-default
+      group_wait: 5m
+      group_interval: 30m
+      repeat_interval: 24h
+      active_time_intervals: [working-hours]
+      routes:
+        - matchers: [team="payments-team"]
+          receiver: payments-queue
+        - matchers: [team="discovery-team"]
+          receiver: discovery-queue
+        - matchers: [team="data-platform-team"]
+          receiver: data-platform-queue
+
+inhibit_rules:
+  # A page already covers the problem: do not also open a ticket for the same SLO.
+  - source_matchers: [severity="page"]
+    target_matchers: [severity="ticket"]
+    equal: [service, slo]
+
+  # During a declared maintenance window, budget burn alerts for that service stay quiet.
+  # The SLI still records the errors, so the budget remains honest.
+  - source_matchers: [alertname="MaintenanceWindow"]
+    target_matchers: [alertname=~".+BudgetBurn"]
+    equal: [service]
+
+time_intervals:
+  - name: working-hours
+    time_intervals:
+      - weekdays: ["monday:friday"]
+        times:
+          - start_time: "08:00"
+            end_time: "18:00"
+        location: UTC
+
+receivers:
+  - name: catch-all
+    webhook_configs:
+      - url: http://alert-sink.invalid/catch-all
+        send_resolved: false
+  - name: oncall-default
+    webhook_configs:
+      - url: http://alert-sink.invalid/pager/default
+  - name: payments-pager
+    webhook_configs:
+      - url: http://alert-sink.invalid/pager/payments
+  - name: discovery-pager
+    webhook_configs:
+      - url: http://alert-sink.invalid/pager/discovery
+  - name: data-platform-pager
+    webhook_configs:
+      - url: http://alert-sink.invalid/pager/data-platform
+  - name: tickets-default
+    webhook_configs:
+      - url: http://alert-sink.invalid/tickets/default
+  - name: payments-queue
+    webhook_configs:
+      - url: http://alert-sink.invalid/tickets/payments
+  - name: discovery-queue
+    webhook_configs:
+      - url: http://alert-sink.invalid/tickets/discovery
+  - name: data-platform-queue
+    webhook_configs:
+      - url: http://alert-sink.invalid/tickets/data-platform

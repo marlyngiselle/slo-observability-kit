@@ -1,0 +1,73 @@
+# Local SLO stack: synthetic workload -> OpenTelemetry Collector -> Prometheus
+# (generated rules) -> Alertmanager, with Grafana showing the generated dashboards.
+#
+#   docker compose up -d
+#   CHECKOUT_ERROR_RATIO=0.05 docker compose up -d demo-service   # simulate an incident
+#
+# Local use only: Grafana allows anonymous viewers and nothing here is hardened.
+
+name: slo-observability-kit
+
+services:
+  demo-service:
+    image: python:3.12.7-slim
+    command: ["python", "/app/synthetic_service.py"]
+    environment:
+      CHECKOUT_ERROR_RATIO: ${CHECKOUT_ERROR_RATIO:-0.0005}
+      SEARCH_SLOW_RATIO: ${SEARCH_SLOW_RATIO:-0.02}
+      INGESTION_STALLED: ${INGESTION_STALLED:-0}
+    volumes:
+      - ./demo/synthetic_service.py:/app/synthetic_service.py:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command:
+      - --config=/etc/otelcol/collector.yaml
+      - --config=/etc/otelcol/collector.local.yaml
+    volumes:
+      - ./otel:/etc/otelcol:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on: [prometheus, jaeger, demo-service]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-remote-write-receiver
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./examples/generated/prometheus/rules:/etc/prometheus/rules:ro
+    ports:
+      - "9090:9090"
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/checkout-api.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./examples/generated/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
